@@ -24,12 +24,9 @@ const registerRules2=()=>{
         })
 
         if(target_initiators.length!==0 && target_paths.length!=0 && methods.length!=0 && dests.length!=0){
-            console.log('Successfully gotten all rules');
             const formatted=formaT(result)
             addRuleListeners2(formatted)
             
-        }else{
-            console.log('Error fetching all the rules');
         }
 
         // addIntpt2(target_initiators,target_paths,methods,dests)
@@ -93,39 +90,49 @@ const addRuleListeners2=(rule_arr)=>{
                 }
                 else{
                     if(n.method.toUpperCase()=='POST'){
-                        if(rule.targeturls){
-                            if(rule.targeturls.length==1){
-                                
-                                if(n.url.includes(rule.targeturls[0])){
-                                    if(rule.methods.includes(n.method.toUpperCase())){
-                                        duplicatePostRequest(n.url,n.requestBody,reqHeaders,n.method,rule.destination)
-                                    }
-                                    
-                                }else{
-                                    // console.log('not valid')
-                                    // console.log(n.url)
-                                }
-                            }
-                            else if(rule.targeturls.length>1){
-                                if(n.url.includes(rule.targeturls[0]) && n.url.includes(rule.targeturls[1])){
-                                    if(rule.methods.includes(n.method.toUpperCase())){
-                                        duplicatePostRequest(n.url,n.requestBody,reqHeaders,n.method,rule.destination)
-                                    }
-                                }
-                                else{
-                                    // console.log('not valid')
-                                    // console.log(n.url)
-                                }
-                            }
+
+
+                        if(rule.methods.includes('POST')){
+                            let pageRelevant=false
                         }
+
+                        // if(rule.targeturls){
+                        //     if(rule.targeturls.length==1){
+                                
+                        //         if(n.url.includes(rule.targeturls[0])){
+                        //             if(rule.methods.includes(n.method.toUpperCase())){
+                        //                 duplicatePostRequest(n.url,n.requestBody,reqHeaders,n.method,rule.destination)
+                        //             }
+                                    
+                        //         }else{
+                        //             // console.log('not valid')
+                        //             // console.log(n.url)
+                        //         }
+                        //     }
+                        //     else if(rule.targeturls.length>1){
+                        //         if(n.url.includes(rule.targeturls[0]) && n.url.includes(rule.targeturls[1])){
+                        //             if(rule.methods.includes(n.method.toUpperCase())){
+                        //                 duplicatePostRequest(n.url,n.requestBody,reqHeaders,n.method,rule.destination)
+                        //             }
+                        //         }
+                        //         else{
+                        //             // console.log('not valid')
+                        //             // console.log(n.url)
+                        //         }
+                        //     }
+                        // }
+
+
+
+
                     }
 
                     
                 }
     
-            },{urls:rule.rootUrls},["requestBody"])
+            },{urls:[`${rule.url_first}*`]},["requestBody"])
         })
-        console.log("Rule listeners added")
+        console.log("Rule listeners added(POST)")
     }
     
 }
