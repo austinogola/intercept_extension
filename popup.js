@@ -37,12 +37,15 @@ form.addEventListener('submit',e=>{
         user_id_label.innerText=`User ID : (${user_id_input.value})`
         localStorage.setItem('localUser_ID',user_id_input.value)
         chrome.runtime.sendMessage({setId:user_id_input.value})
+        statusText.innerText='Connected'
+        statusText.style.color='#2196F3'
+        statusColor.style.backgroundColor='#2196F3'
     }
 
     if(txt_input.value!==''){
-        txt_label.innerText=`Text : (${txt_input.value})`
+        txt_label.innerText=`Task : (${txt_input.value})`
         localStorage.setItem('localUser_text',txt_input.value)
-        chrome.runtime.sendMessage({setTxt:txt_input.value})
+        chrome.runtime.sendMessage({setTask:txt_input.value})
     }
 
     user_id_input.value=''
@@ -101,9 +104,9 @@ async function checkState(){
         statusText.innerText='Enter your ID' 
     }
     if(text){
-        console. log('text found',text)
-        txt_label.innerText=`Text : (${text})`
-        chrome.runtime.sendMessage({setTxt:text})
+        console. log('task found',text)
+        txt_label.innerText=`Task : (${text})`
+        chrome.runtime.sendMessage({setTask:text})
     }else{
         
     }

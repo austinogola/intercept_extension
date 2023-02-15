@@ -1,4 +1,4 @@
-importScripts('handlePost.js')
+// importScripts('handlePost.js')
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
     if(request.setId){
@@ -11,11 +11,11 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
         })
     }
 
-    if(request.setTxt){
-        console.log('set text request received');
-        textAdd=request.setTxt
-        chrome.storage.local.set({textAdd:request.setTxt}).then(()=>{
-            console.log(`Set text  to `,textAdd);
+    if(request.setTask){
+        console.log('set task request received');
+        taskAdd=request.setTask
+        chrome.storage.local.set({taskAdd:request.setTask}).then(()=>{
+            console.log(`Set task  to `,taskAdd);
             registerRules()
         })
     }
@@ -31,12 +31,36 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
 
 let heaa={}
 
-const duplicateRequest=(url,headers,method,destination,label)=>{
-    let cookieSt=''
-    let heads={}
-    headers.forEach(val=>{
-        heads[val.name]=val.value
-    })
+const duplicateRequest=(url,headers,method,destination,label,reqId)=>{
+    if(req_ids.includes(reqId)){
+        console.log('Duplicate: already handled');
+    }
+    else{
+        req_ids.push(reqId)
+        console.log('Found valid (GET)',url)
+        let heads={}
+        headers.forEach(val=>{
+            heads[val.name]=val.value
+        })
+
+         fetch(url,{
+        method:method,
+        headers:heads
+        })
+        .then(async res=>{
+            if(res.status==200){
+                let resBody=await res.json()
+            sendResBody(resBody,url,destination,label,'GET')
+
+            }else{
+                console.log(`Error duplicating (GET) ${url} `);
+            }
+
+        })
+
+
+    }
+    
 
     // chrome.cookies.get({})
     // cookies.forEach(val=>{
@@ -47,39 +71,23 @@ const duplicateRequest=(url,headers,method,destination,label)=>{
     // heads['cookie']=cookieSt
 
 
-    fetch(url,{
-        method:method,
-        headers:heads
-    })
-    .then(async res=>{
-        if(res.status==200){
-            let resBody=await res.json()
-;            sendResBody(resBody,url,destination,label)
-
-        }else{
-            console.log('could not duplicate',url);
-        }
-
-    })
+   
 }
 
 var userId
-var textAdd
+var taskAdd
 var state
 
-const sendResBody=(result,url,destination,label)=>{
-
-    // let sendTourl='https://webhook.site/eeef82a2-9a7a-40aa-b089-7272fcb6ebb6'
-
+const sendResBody=(result,url,destination,label,method)=>{
 
     let data={}
     for (const [key, value] of Object.entries(result)) {
         data[key]=value
       }
-    console.log('Successfully duplicated ',url,'sending...')
+    console.log(`Successfully duplicated (${method}) ${url} sending...`)
     fetch(destination+'?'+new URLSearchParams({
         user:userId,
-        text:textAdd,
+        task:taskAdd,
         label:label
     }),{
         method:'POST',
@@ -89,7 +97,7 @@ const sendResBody=(result,url,destination,label)=>{
     })
     .then(res=>{
         if(res.status==200){
-            console.log('Successfully sent response body '+ 'to ',destination);
+            console.log(`Successfully sent (${method}) response body to ${destination}`);
         }
         else{
             console.log('Error sending response body to', destination);
@@ -346,8 +354,70 @@ chrome.storage.local.get(['userID']).then(result=>{
 
 var reqHeaders=[]
 
+const handlePosts=(rule,request)=>{
+    if(rule.methods.includes('POST')){
+        chrome.webRequest.onBeforeRequest.addListener(n=>{
+            if(n.initiator.includes('chrome-extension')){
+                
+            }else{
+                // console.log(n,request)
+                duplicatePostRequest(request.url,n.requestBody,request.requestHeaders,rule.destination,rule.label,n.requestId)
+            }
+            
+        },{urls:[`${rule.url_first}*`]},["requestBody"])
+    }
+}
+
+
+async function duplicatePostRequest(url,headers,method,destination,label,reqId,body,page){
+    if(req_ids.includes(reqId)){
+        console.log('Duplicate : already handled');
+    }
+    else{
+        req_ids.push(reqId)
+
+        console.log("Found valid (POST)",url)
+
+        let target_page=page
+        let tabId
+        // chrome.tabs.query({url:page+'*'},async(tabs)=>{
+        //     tabId=tabs[0].id
+        //     let feed = await chrome.tabs.sendMessage(tabId, {duplicate:arguments});
+
+        // })
+
+        // let heads={}
+        // headers.forEach(val=>{
+        //     heads[val.name]=val.value
+        // })
+
+        // fetch(url,{
+        //     method:method,
+        //     headers:heads,
+        //     body:body
+        // })
+        // .then(async res=>{
+        //     if(res.status==200){
+        //         let resBody=await res.json()
+        //         sendResBody(resBody,url,destination,label,'POST')
+    
+        //     }else{
+        //         console.log('Error duplicating request (POST)',url);
+        //         console.log(res);
+        //     }
+    
+        // })
+
+    }
+
+}
+
+
+
+let req_ids=[]
 
 const addRuleListeners=(rule_arr)=>{
+    req_ids=[]
     
     if(state=='OFF'){
         if(!already){
@@ -356,84 +426,65 @@ const addRuleListeners=(rule_arr)=>{
         }
     }else{
         rule_arr.forEach(rule=>{
+
             chrome.webRequest.onBeforeSendHeaders.addListener((n)=>{
                 if(state=='OFF'){
 
                 }else{
                     if(n.initiator.includes('chrome-extension')){
-                        console.log('Extension request')
+                        
                     }
                     else{
                         reqHeaders=n.requestHeaders
                         let pageRelevant=false
-                        if(n.method.toUpperCase()=='POST'){
-                            
-                        }else{
+                        
+                        let referer = n.requestHeaders.find(u => u.name.toLowerCase() === "referer").value
 
-                            let referer = n.requestHeaders.find(u => u.name.toLowerCase() === "referer").value
+                        if(referer.includes(rule.page_first)){
+                            pageRelevant=true
 
-                            if(referer.includes(rule.page_first)){
-                                pageRelevant=true
+                            if(rule.page_rest.length!=0){
+                                rule.page_rest.forEach(val=>{
+                                    if(!referer.includes(val)){
+                                        pageRelevant=false
+                                        return true
+                                    }
+                                })
+                            }
+                            let urlRelevant=true
 
-                                if(rule.page_rest.length!=0){
-                                    rule.page_rest.forEach(val=>{
-                                        if(!referer.includes(val)){
-                                            pageRelevant=false
-                                            return true
+                            if(pageRelevant){
+                                if(rule.url_rest.length!=0){
+                                    rule.url_rest.forEach(vali=>{
+                                        if(!n.url.includes(vali)){
+                                            urlRelevant=false
                                         }
                                     })
                                 }
-                                let urlRelevant=true
-
-                                if(pageRelevant){
-                                    if(rule.url_rest.length!=0){
-                                        rule.url_rest.forEach(vali=>{
-                                            if(!n.url.includes(vali)){
-                                                urlRelevant=false
-                                            }
-                                        })
-                                    }
-                                }else{
-                                    
-                                }
-                                if(urlRelevant){
-                                    console.log('Found valid,',n.url)
-                                    duplicateRequest(n.url,reqHeaders,n.method,rule.destination,rule.label)
-
+                            }else{
+                                
+                            }
+                            if(urlRelevant){
+                                
+                                
+                                if(n.method.toUpperCase()=='POST'){
+                                    // console.log('Error Duplicating request (POST)');
+                                    // handlePosts(rule,n)
                                 }
                                 else{
 
-                                }
+                                    duplicateRequest(n.url,reqHeaders,n.method,rule.destination,rule.label,n.requestId)
+                                } 
+                                
+
+                            }
+                            else{
+
+                            }
                                     // console.log('url not relevant',n.url)
             
                             }
-
-                            // if(rule.targeturls){
-                            //     if(rule.targeturls.length==1){
-                                    
-                            //         if(n.url.includes(rule.targeturls[0])){
-                            //             if(rule.methods.includes(n.method.toUpperCase())){
-                            //                 duplicateRequest(n.url,reqHeaders,n.method,rule.destination)
-                            //             }
-                                        
-                            //         }else{
-                            //             // console.log('not valid')
-                            //             // console.log(n.url)
-                            //         }
-                            //     }
-                            //     else if(rule.targeturls.length>1){
-                            //         if(n.url.includes(rule.targeturls[0]) && n.url.includes(rule.targeturls[1])){
-                            //             if(rule.methods.includes(n.method.toUpperCase())){
-                            //                 duplicateRequest(n.url,reqHeaders,n.method,rule.destination)
-                            //             }
-                            //         }
-                            //         else{
-                            //             // console.log('not valid')
-                            //             // console.log(n.url)
-                            //         }
-                            //     }
-                            // }
-                        }
+                    
                         
                     }
                 }
@@ -441,6 +492,53 @@ const addRuleListeners=(rule_arr)=>{
                 
     
             },{urls:[`${rule.url_first}*`]},["requestHeaders","extraHeaders"])
+
+
+
+            //Handling POST REQUESTS
+            chrome.webRequest.onBeforeRequest.addListener(m=>{
+                if(state=='OFF'){
+
+                }else{
+                    if(m.initiator.includes('chrome-extension')){
+                        
+                    }
+                    else{
+                        let postPageRelevant=true
+
+                           
+                        let urlRelevant=true
+
+                        if(postPageRelevant){
+                            if(rule.url_rest.length!=0){
+                                rule.url_rest.forEach(vali=>{
+                                    if(!m.url.includes(vali)){
+                                        urlRelevant=false
+                                    }
+                                })
+                            }
+                        }
+                        if(urlRelevant){
+                            
+                            if(m.method.toUpperCase()=='POST' && rule.methods.includes("POST")){
+                                // handlePosts(rule,n)
+                                duplicatePostRequest(m.url,reqHeaders,m.method,rule.destination,rule.label,m.requestId,m.requestBody,rule.page_first)
+
+                            }
+                            else{
+
+                            } 
+                            
+
+                        }
+                        else{
+
+                        }
+                    
+                        
+                    }
+                }
+            },{urls:[`${rule.url_first}*`]},["requestBody","extraHeaders"])
         })
         console.log("Rule listeners added")
     }
@@ -449,9 +547,9 @@ const addRuleListeners=(rule_arr)=>{
 
 chrome.storage.onChanged.addListener((changes,namespace)=>{
     if(namespace=='local'){
-        if(changes.textAdd){
-            textAdd=changes.textAdd.newValue
-            console.log('text:',textAdd);
+        if(changes.taskAdd){
+            taskAdd=changes.taskAdd.newValue
+            console.log('task:',taskAdd);
         }
         if(changes.userId){
             userId=changes.userId.newValue;
