@@ -18,13 +18,20 @@ toggler.addEventListener('click',e=>{
         title.innerHTML='Connected'
         console.log('Changed to connected');
         localStorage.setItem('Ext_state','ON')
-        checkState()
+        chrome.runtime.sendMessage({state: 'ON'})
+        statusText.innerText='Connected'
+        statusText.style.color='#2196F3'
+        statusColor.style.backgroundColor='#2196F3'
         
     }else{
         title.innerHTML='Disconnected'
         console.log('Changed to disconnected');
         localStorage.setItem('Ext_state','OFF')
-        checkState()
+        chrome.runtime.sendMessage({state: 'OFF'})
+        statusText.innerText='Disconnected'
+        statusText.style.color='#F1592B'
+        statusColor.style.backgroundColor='#F1592B'
+        // checkState()
     }
 })
 
@@ -51,7 +58,6 @@ form.addEventListener('submit',e=>{
     user_id_input.value=''
     txt_input.value=''
 
-    checkState()
 })
 
 
@@ -72,7 +78,7 @@ async function checkState(){
             toggler.checked=false
             statusColor.style.backgroundColor='#F1592B'
             
-            chrome.runtime.sendMessage({state: 'OFF'})
+            chrome.runtime.sendMessage({state: 'OFF',un:true})
         }else{
             title.innerHTML='Connected'
             console.log(statusColor.style)
@@ -80,14 +86,14 @@ async function checkState(){
             statusText.innerText='Connected'
             statusText.style.color='#2196F3'
             toggler.checked=true
-            chrome.runtime.sendMessage({state: 'ON'})
+            chrome.runtime.sendMessage({state: 'ON',un:true})
 
 
         }
     }
     else{
         localStorage.setItem('state','ON')
-        chrome.runtime.sendMessage({state: 'ON',popup:true})
+        chrome.runtime.sendMessage({state: 'ON',popup:true,un:true})
     }
 
     if(userId){
@@ -96,7 +102,7 @@ async function checkState(){
         // statusText.style.color='#2196F3'
         // statusText.innerText='Connected'
         user_id_label.innerText=`User ID : (${userId})`
-        chrome.runtime.sendMessage({setId:userId})
+        chrome.runtime.sendMessage({setId:userId,un:true})
     }
     else{
         statusColor.style.backgroundColor='#F1592B'
@@ -106,7 +112,7 @@ async function checkState(){
     if(text){
         console. log('task found',text)
         txt_label.innerText=`Task : (${text})`
-        chrome.runtime.sendMessage({setTask:text})
+        chrome.runtime.sendMessage({setTask:text,un:true})
     }else{
         
     }

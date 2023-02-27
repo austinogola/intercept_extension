@@ -3,12 +3,17 @@
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
     if(request.setId){
         console.log('set id request received');
-        userId=request.setId
         chrome.storage.local.set({userId:request.setId}).then(()=>{
             console.log(`Set userId to`,userId);
-            registerRules()
             
         })
+        userId=request.setId
+        if(request.un){
+
+        }else{
+            registerRules()
+            registerActions() 
+        }
     }
 
     if(request.setTask){
@@ -16,20 +21,197 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
         taskAdd=request.setTask
         chrome.storage.local.set({taskAdd:request.setTask}).then(()=>{
             console.log(`Set task  to `,taskAdd);
-            registerRules()
         })
+        if(request.un){
+
+        }else{
+            registerRules()
+            registerActions() 
+        }
     }
 
     if(request.state){
         state=request.state
         console.log(`Received signal `);
         chrome.storage.local.set({state:request.state}).then(()=>{
-            registerRules()
+            console.log(`STATE `,request.state);
         })
+        if(request.state=='ON'){
+            registerRules()
+            registerActions()
+        }
+        
+    }
+
+    if(request.update){
+        console.log(request.update)
+        if(request.update.includes('navig')){
+            console.log('loading page...');
+        }
+        // if(request.proceedFlow){
+        //     let action=actionsArr.filter(item=>item.objectId==request.proceedFlow)
+        //     let activities=action[0].actions;
+        //     console.log(activities.slice(request.position[0],activities.length));
+        //     await sleep(5000)
+        //     chrome.tabs.sendMessage(sender.tab.id, {
+        //         proceedActions:activities,
+        //         id:action.objectId,
+        //         positions:activities.slice(request.position[1],activities.length)
+        //     });
+            
+        // }
+
+    }
+
+    if(request.proceedActions){
+
+        
+        let fl=[...request.proceedActions]
+        let target_page
+        fl[0].forEach(item=>{
+            console.log(item);
+            if(item.event){
+                if(item.event=='navigate'){
+                    target_page=item.target
+                }
+            }else{
+                
+            }
+        })
+        chrome.tabs.onUpdated.addListener(function (tabIdty , info,tab) {
+            if (info.status === 'complete') {
+             
+              if(tab.url==target_page && tab.windowId==windowId){
+                console.log('Navigated page finished loading, continuing');
+                let tabId=tab.id
+                fl.shift()
+                chrome.tabs.sendMessage(sender.tab.id, {performActions:fl});
+                // let flow=action.actions
+                // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
+              }
+            }
+          });
+        // await sleep(10000)
+        // console.log('Continuing with actions');
+        // chrome.tabs.query({windowId:windowId,url:fl[0].target},(tabs)=>{
+        //     let tabig=tabs[0].id
+        //     console.log(tabs[0]);
+        //     fl.shift()
+        //     chrome.tabs.sendMessage(sender.tab.id, {performActions:fl});
+        // })
+        
+        
+    }
+    if(request.startFlow){
+
+
+        let fl=request.startFlow
+        let first=fl[0]
+        fl.shift()
+        
+        if(first){
+            console.log('Starting flow:',first);
+            let flowTab=sender.tab.id
+            if(first.flow[0].event=='navigate'){
+                chrome.tabs.onUpdated.addListener(function (tabIdty , info) {
+                    if (info.status === 'complete') {
+                        console.log(info);
+                      // your code ...
+                      if(tabIdt==tabId && tab.url==action.target_page){
+                        console.log('Opened tab finished loading');
+                        let flow=action.actions
+                        chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
+                      }
+                    }
+                  });
+    
+                chrome.tabs.sendMessage(flowTab, {tuanze:first,curr:fl,repeat:first.repeat});
+                await sleep(5000)
+                let sec=fl[0]
+                console.log(sec);
+                chrome.tabs.sendMessage(flowTab, {tuanze:sec,curr:fl,repeat:sec.repeat});
+            }
+            else{
+                chrome.tabs.sendMessage(flowTab, {tuanze:first,curr:fl,repeat:first.repeat});
+            }
+        }
+        else{
+            console.log('Actions finished');
+        }
+        
+        
     }
 })
 
+chrome.runtime.onConnect.addListener((port)=>{
+    console.log('Conection made',port)
+    let fTab=port.sender.tab.id
+    console.log(fTab);
+    port.onMessage.addListener(async(message,port)=>{
+        console.log(message);
+        if(message.startFlow){
+            console.log('Recevied flow',message.startFlow);
+            let fl=message.startFlow
+            let first=fl[0]
+
+            fl.shift()
+            console.log(first);
+            let rpt=first.repeat?first.repeat:1
+            if(first.flow[0].event=='navigate'){
+                let flowID=port.sender.tab.id;
+                
+                let navFlow=first.flow[0]
+                const tempFlow=[first.flow[0]]
+                
+                port.postMessage({execute:tempFlow,rest:fl,rpt:rpt})
+
+                chrome.tabs.onUpdated.addListener(function (tabIdt , info,tab) {
+                    if (info.status === 'complete') {
+                      // your code ...
+                      if(tabIdt==flowID && tab.url==action.first.flow[0].target){
+                        console.log('Opened tab finished loading');
+                        let flow=action.actions
+                        chrome.tabs.sendMessage(flowID, {startConnect:true,flow:fl,id:action.objectId});
+                      }
+                    }
+                  });
+
+                // first.flow.shift()
+                
+                // // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
+                // await sleep(3000)
+
+                // port.postMessage({execute:first.flow,rest:fl,rpt:rpt})
+
+                // chrome.tabs.sendMessage(flowTab, {tuanze:first,curr:fl,repeat:first.repeat});
+                // await sleep(5000)
+                // let sec=fl[0]
+                // console.log(sec);
+                // chrome.tabs.sendMessage(flowTab, {tuanze:sec,curr:fl,repeat:sec.repeat});
+            }else{
+                port.postMessage({execute:first.flow,rest:fl,rpt:rpt})
+            }
+            
+
+            // for(let i=1;i<=rpt;i++){
+            //     console.log(i);
+            //     for(let m=0;m<first.flow.length;m++){
+            //         console.log(first.flow[m]);
+            //         if(m==first.flow.length-1){
+                        
+            //         }
+            //         else{
+            //             let res=await chrome.tabs.sendMessage(fTab,{execute:first.flow[m]}) 
+            //         }
+                    
+            //     }
+            // }
+        }
+    })
+})
+
 let heaa={}
+let actionsArr
 
 const duplicateRequest=(url,headers,method,destination,label,reqId)=>{
     if(req_ids.includes(reqId)){
@@ -347,6 +529,7 @@ chrome.storage.local.get(['userID']).then(result=>{
         console.log('User id found');
         userId=result.userId
         registerRules()
+        registerActions()
     }else{
         console.log('No user Id',result);
     }
@@ -545,27 +728,229 @@ const addRuleListeners=(rule_arr)=>{
     
 }
 
-chrome.storage.onChanged.addListener((changes,namespace)=>{
-    if(namespace=='local'){
-        if(changes.taskAdd){
-            taskAdd=changes.taskAdd.newValue
-            console.log('task:',taskAdd);
-        }
-        if(changes.userId){
-            userId=changes.userId.newValue;
-            console.log('userId:',userId);
-        }
-        if(changes.state){
-            console.log(state);
-        }
+// chrome.storage.onChanged.addListener((changes,namespace)=>{
+//     if(namespace=='local'){
+//         if(changes.taskAdd){
+//             taskAdd=changes.taskAdd.newValue
+//             console.log('task:',taskAdd);
+//             registerRules()
+//             registerActions()
+//         }
+//         if(changes.userId){
+//             userId=changes.userId.newValue;
+//             console.log('userId:',userId);
+//             registerRules()
+//             registerActions()
+//         }
+//         if(changes.state){
+//             if(changes.state.newValue=='ON'){
+//                 registerRules()
+//                 registerActions()
+//             }
+//             console.log(state);
+//         }
 
-
-        registerRules()
-    }
+//     }
     
-})
+// })
 
 let already=false
 
+let windowId
+let tabId
+
+const sleep=(ms)=> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+const makeWindow=(url,sleeper)=>{
+    
+    return new Promise(async(resolve,reject)=>{
+        if(sleeper){
+            await sleep(10000)
+        }
+        if(windowId){
+            console.log('Adding to old');
+            chrome.tabs.create({
+                url:url,
+                windowId:windowId
+            },(tab)=>{
+                resolve(tab.id)
+            })
+            
+        }else{
+            console.log('making new');
+            chrome.windows.create({
+                focused:false,
+                type:'normal',
+                height:600,
+                width:1300,
+                left:60,
+                top:200,
+                url:url
+            },(window)=>{
+                windowId=window.id
+                resolve(window.tabs[0].id)
+
+            })  
+        }
+    })
+}
+
+const runActions=async(tabId,action)=>{
+    console.log(tabId);
+    console.log(action);
+    let allActions=action.actions
+    let portId=action.objectId
+    let spreadActions=[]
+    allActions.forEach(item=>{
+        let rpt=item.repeat?item.repeat:1
+        delete item.repeat
+        let arr=[]
+        for(let i=1;i<=rpt;i++){
+            item.flow.forEach(meth=>{
+                if(item.stop_if_present){
+                    meth.stopper=item.stop_if_present
+                }
+                    
+                // }
+                // console.log(meth);
+                // if(meth.event){
+                //     if(meth.event=='navigate'){
+                //         arr.push(meth)
+                //         spreadActions.push(arr)
+                //     }
+                // }
+                arr.push(meth)
+
+                
+            })
+        }
+        spreadActions.push(arr)
+    })
+
+    console.log(spreadActions);
+    chrome.tabs.sendMessage(tabId, {performActions:spreadActions});
+    // for (let i=0;i<spreadActions.length;i++){
+    //     if(spreadActions[i].event=='navigate'){
+    //         console.log('navigating now');
+    //         let res=await chrome.tabs.sendMessage(tabId, {doSingle:spreadActions[i]});
+    //         console.log('Searching tab',spreadActions[i].target);
+    //         await sleep(10000)
+    //         chrome.tabs.query(
+    //             {url:spreadActions[i].target,windowId:windowId},(tab)=>{
+    //                 console.log(tab);
+    //                 tabId=tab[0].id
+    //             }
+                
+    //           )
+            
+    //     }
+    //     else{
+    //         let res=await chrome.tabs.sendMessage(tabId, {doSingle:spreadActions[i]});
+    //     }
+    //     await sleep(1000)
+    // }
+    
+
+}
+
+const interact=async(actions)=>{
+
+    actions=actions.filter(item=>item.userID==userId)
+    console.log('Formatted actions for ',userId,actions);
+
+    actions.forEach(async (action,indx)=>{
+        let tabId=await makeWindow(action.target_page,false)
+        console.log(tabId);
+        
+        // let flow=action.actions
+        // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
+
+        chrome.tabs.onUpdated.addListener(function (tabIdt , info,tab) {
+            // console.log(tabIdt);
+            // console.log(tab);
+            if (info.status === 'complete') {
+                // console.log(info);
+              // your code ...
+              if(tabIdt==tabId && tab.url==action.target_page){
+                console.log('Opened tab finished loading');
+                let flow=action.actions
+                runActions(tabId,action)
+                // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
+                
+              }
+            }
+          });
+
+        
+
+        // for(let i=0;i<action.actions.length;i++){
+        //     await sleep(3000)
+        //     let flow=action.actions[i].flow
+        //         for(let k=0;k<flow.length;k++){
+        //             chrome.tabs.sendMessage(tabId, {makeFlow:flow[k]});
+        //         }
+        //     // for(let j=0;j<action.actions[i].repeat;j++){
+        //     //     // console.log(action.actions[i].flow);
+                
+                
+        //     // }
+            
+        // }
+        
+        
+        
+    })
+    
+    
+}
+
+
+const registerActions=()=>{
+    
+    // userId=userId.replace("'","")
+    
+    if(state=='ON'){
+        if(userId){
+            console.log(`Fetching actions for ${userId}`)
+            let actionsUri=`https://matureshock.backendless.app/api/data/action?userID=${userId}`
+    
+            fetch(actionsUri,{
+                method:'GET',
+                headers:{
+                    'Content-Type':'application/json'
+                }
+            })
+            .then(res=>{
+                return res.json()
+            })
+            .then(result=>{
+    
+                // const rules=result['rules']
+                // const destination=result['destination']
+    
+                // rules.forEach(rule)
+    
+                console.log('actions...',result);
+                actionsArr=result
+
+                interact(result)
+                
+        
+            })
+        }else{
+            console.log('No user id');
+        }
+    }else{
+        console.log('Interceptor OFF')
+    }
+    
+    
+    // rob-110  
+    
+}
+
+registerActions()
 
 
