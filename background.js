@@ -11,7 +11,8 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
         if(request.un){
 
         }else{
-            registerRules()
+            let rule_status=await registerRules()
+            console.log(rule_status,'\n','Running Actions');
             registerActions() 
         }
     }
@@ -25,8 +26,9 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
         if(request.un){
 
         }else{
-            registerRules()
-            registerActions() 
+            let rule_status=await registerRules()
+            console.log(rule_status,'\n','Running Actions');
+            registerActions()  
         }
     }
 
@@ -37,8 +39,9 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
             console.log(`STATE `,request.state);
         })
         if(request.state=='ON'){
-            registerRules()
-            registerActions()
+            let rule_status=await registerRules()
+            console.log(rule_status,'\n','Running Actions');
+            registerActions() 
         }
         
     }
@@ -47,6 +50,11 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
         console.log(request.update)
         if(request.update.includes('navig')){
             console.log('loading page...');
+        }
+        if(request.update.includes('tions fini')){
+            chrome.tabs.remove(sender.tab.id,()=>{
+                console.log('Closed tab');
+            })
         }
         // if(request.proceedFlow){
         //     let action=actionsArr.filter(item=>item.objectId==request.proceedFlow)
@@ -78,6 +86,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
                 
             }
         })
+        console.log(target_page);
         chrome.tabs.onUpdated.addListener(function (tabIdty , info,tab) {
             if (info.status === 'complete') {
              
@@ -307,71 +316,95 @@ const sendResBody=(result,url,destination,label,method)=>{
 let attached=false
 
 const registerRules=()=>{
-    
-    // userId=userId.replace("'","")
-    if(state=='ON'){
-        if(userId){
-            console.log('Fetching rules for',userId,' ...')
-            let rulesUri=`https://matureshock.backendless.app/api/data/rule?where=userID='${userId}'`
-    
-            fetch(rulesUri,{
-                method:'GET',
-                headers:{
-                    'Content-Type':'application/json'
-                }
-            })
-            .then(res=>{
-                return res.json()
-            })
-            .then(result=>{
-    
-                // const rules=result['rules']
-                // const destination=result['destination']
-    
-                // rules.forEach(rule)
-    
-                console.log('rules...',result);
-                let target_page=[]
-                let target_urls=[]
-                let methods=[]
-                let dests=[]
-                result.forEach(rule=>{
 
-                    target_page.push(rule.target_page_url)
-                    // target_request_url=rule.target_request_url.replace('*','')
-                    target_urls.push(rule.target_request_url)
-                    methods.push(rule.target_request_method[0])
-                    dests.push(rule.destination_webhook_url)
-                })
-        
-                if(target_page.length!==0 && target_urls.length!=0 && methods.length!=0 && dests.length!=0){
-                    console.log('Formating rules...');
-                    const formatted=formaT(result)
-                    console.log('valid enabled rules',formatted)
-                    // if(formatted.length)
-                    addRuleListeners(formatted)
-                }
-                else{
-                    console.log('Error fetching all the rules');
-                    // console.log(result);
-                }
-                // addIntpt(target_page,target_urls,methods,dests)
+    return new Promise(async(resolve,reject)=>{
+        if(state=='ON'){
+            if(userId){
+                console.log('Fetching rules for',userId,' ...')
+                let rulesUri=`https://matureshock.backendless.app/api/data/rule?where=userID='${userId}'`
                 
+                let res=await fetch(rulesUri,{
+                    method:'GET',
+                    headers:{
+                        'Content-Type':'application/json'
+                    }
+                })
+
+                if(res.status==200){
+                    let result=await res.json()
+                    const formatted=await formaT(result)
+
+                    if(formatted.length!=0){
+                        addRuleListeners(formatted)
+                        console.log(`Formatted rules for ${userId}`);
+                        resolve("Done")
+                    }
+                    else{
+                        console.log('No rules to intercept');
+                        resolve(`No ENABLED rules for ${userId}`)
+                    }
+
+
+                }else{
+                    resolve(`Error fetching rules for ${userId}`)
+                }
+                // .then(res=>{
+                //     return res.json()
+                // })
+                // .then(result=>{
         
-            })
+                //     // const rules=result['rules']
+                //     // const destination=result['destination']
+        
+                //     // rules.forEach(rule)
+        
+                //     console.log('rules...',result);
+                //     let target_page=[]
+                //     let target_urls=[]
+                //     let methods=[]
+                //     let dests=[]
+                //     result.forEach(rule=>{
+    
+                //         target_page.push(rule.target_page_url)
+                //         // target_request_url=rule.target_request_url.replace('*','')
+                //         target_urls.push(rule.target_request_url)
+                //         methods.push(rule.target_request_method[0])
+                //         dests.push(rule.destination_webhook_url)
+                //     })
+            
+                //     if(target_page.length!==0 && target_urls.length!=0 && methods.length!=0 && dests.length!=0){
+                //         console.log('Formating rules...');
+                //         const formatted=await formaT(result)
+                //         console.log('valid enabled rules',formatted)
+                //         // if(formatted.length)
+                //         addRuleListeners(formatted)
+                //     }
+                //     else{
+                //         console.log('Error fetching all the rules');
+                //         // console.log(result);
+                //     }
+                //     // addIntpt(target_page,target_urls,methods,dests)
+                    
+            
+                // })
+            }else{
+                console.log('No user id');
+                resolve('NO ID')
+            }
         }else{
-            console.log('No user id');
+            console.log('Interceptor OFF')
+            resolve('OFF')
         }
-    }else{
-        console.log('Interceptor OFF')
-    }
+
+    })
+    
     
     
     // rob-110  
     
 }
 
-registerRules()
+// registerRules()
 
 const isValidUrl=(string) =>{
     let url;
@@ -447,89 +480,45 @@ const checkUrls=(rule)=>{
 }
 
 const formaT=(raw_rules)=>{
+    console.log(`Raw rules for ${userId} :`,raw_rules);
 
-    const format_rules=[]
+    return new Promise((resolve,reject)=>{
+        const format_rules=[]
 
-    let enabled_rules=[]
+        let enabled_rules=[]
 
-    raw_rules.forEach(rule=>{
-        // If rule.status
-        if(rule.rule_status){
-            enabled_rules.push(rule)
+        raw_rules.forEach(rule=>{
+            // If rule.status
+            if(rule.rule_status){
+                enabled_rules.push(rule)
+            }
+            
+        })
+
+        if(enabled_rules.length>0){
+            enabled_rules.forEach(rule=>{
+                let rule_status=checkUrls(rule)
+                if(rule_status){
+                    format_rules.push(rule_status)
+                }
+            })
+
+            resolve(format_rules)
         }
-        
+        else{
+            resolve(format_rules)
+        }
     })
 
-    if(enabled_rules.length>0){
-        enabled_rules.forEach(rule=>{
-            let rule_status=checkUrls(rule)
-            if(rule_status){
-                format_rules.push(rule_status)
-            }
-        })
-    }
-    else{
-        console.log('No enabled rules',enabled_rules)
-    }
-
-    
-
-    // if(enabled_rules.length>0){
-    //     console.log('Enabled rules',enabled_rules)
-    //     let rootUrls=[]
-
-    //     enabled_rules.forEach(rule=>{
-    //         let fmt_obj={}
-            
-    //         fmt_obj['destination']=rule.destination_webhook_url
-    //         fmt_obj['label']=rule.rule_label
-    //         fmt_obj['methods']=rule.target_request_method
-    
-            
-    //         let page_arr=rule.target_page_url.replaceAll('*','').split('/').filter(i=>i.length>0)
-    
-    //         let head=page_arr[0]
-    //         rootUrls.push(`*://*.${head}/*`)
-    //         rootUrls.push(`*://*/${head}/*`)
-    
-    //         let rest=page_arr.length>1?page_arr.slice(1):null
-    //         // console.log(new URL(head))
-    //         // referer_paths.push(rest)
-    //         // rest_paths.push(ref_path)
-    //         fmt_obj['referer_path']=rest
-    //         fmt_obj['rootUrls']=rootUrls
-    
-    //         let target=rule.target_request_url.replace('*','')
-    //         let target_urls=[]
-    //         target=target.split('*')
-    //         target=target.filter(i=>i.length>0)
-    //         if(target.length>1){
-    //             target_urls.push(target)
-    //         }
-    //         else{
-    //             target_urls.push(target[0])
-    //         }
-    
-    //         fmt_obj['targeturls']=target_urls
-    
-    //         rootUrls=[]
-    //         format_rules.push(fmt_obj)
-    //         console.log('Formatted rules...',format_rules)
-    //     })
-    // }
-    // else{
-    //     console.log('No enabled rules',enabled_rules)
-    // }
-    
-    return format_rules
 }
 
-chrome.storage.local.get(['userID']).then(result=>{
+chrome.storage.local.get(['userID']).then(async result=>{
     if(result.userId){
         console.log('User id found');
         userId=result.userId
-        registerRules()
-        registerActions()
+        let rule_status=await registerRules()
+        console.log(rule_status,'\n','Running Actions');
+        registerActions() 
     }else{
         console.log('No user Id',result);
     }
@@ -600,6 +589,7 @@ async function duplicatePostRequest(url,headers,method,destination,label,reqId,b
 let req_ids=[]
 
 const addRuleListeners=(rule_arr)=>{
+
     req_ids=[]
     
     if(state=='OFF'){
