@@ -5,9 +5,9 @@ chrome.runtime.onMessage.addListener(async(request,sender,sendResponse)=>{
     }
 
     if(request.performActions){
-        // let mm=await runArray(request.performActions)
+        // let mm=awTidrunTidBit(request.performActions)
         // console.log(mm);
-        wholeArr(request.performActions)
+        wholeArr(request.performActions,request.remove)
     }
 
     if(request.doSingle){
@@ -63,75 +63,72 @@ chrome.runtime.onMessage.addListener(async(request,sender,sendResponse)=>{
   
   })
 
-  const wholeArr=async(arr)=>{
+  const wholeArr=async(arr,remove)=>{
     let remaining=[...arr]
     for(let i=0;i<arr.length;i++){
-        let res=await runArray(arr[i],remaining)
-        remaining.shift()
+        let res=await runTidBit(arr[i],remove)
+        if(res=='performed'){
+            remaining.shift()
+        }else{
+            if(res.target){
+                remaining.shift()
+                console.log('Navigating to',res.target);
+                chrome.runtime.sendMessage({update:`navigating to ${res.target}`,remaining:remaining,remove:remove,target:res.target})
+                await sleep(25000)
+            }else{
+                arr=arr.filter(item=>item.stopper!=res.stopper)
+                remaining=remaining.filter(item=>item.stopper!=res.stopper)
+            }
+            
+        }
+        await sleep(300)
     }
-    chrome.runtime.sendMessage({update:`Actions finished...`})
+    chrome.runtime.sendMessage({update:`Actions finished...`,remove:remove})
 
   }
 
-  const handlePerform=async(arr)=>{
-    return new Promise(async(resolve,reject)=>{
-        for(let i=1;i<=repetitions;i++){
-            let men=await runArray(arr)
-            console.log('Finished repetition ',i,' for ',men)
-            await sleep(1500)
-            
-            // await sleep(1000)
-        }
-        resolve(remaining)
-    })
-    
-}
 
 const handleSingle=async(obj)=>{
     await runTidBit(obj)
 }
 
-const handleExecute=async(arr,repetitions,remaining)=>{
-    return new Promise(async(resolve,reject)=>{
-        for(let i=1;i<=repetitions;i++){
-            let men=await runArray(arr)
-            console.log('Finished repetition ',i,' for ',men)
-            await sleep(1500)
-            
-            // await sleep(1000)
-        }
-        resolve(remaining)
-    })
-    
-}
 
-const runTidBit=async(obj,remaining)=>{
+
+const runTidBit=async(obj,remove)=>{
     return new Promise(async(resolve,reject)=>{
         if(obj.wait){
             console.log('Sleeping');
             await sleep(obj.wait*1000)
             chrome.runtime.sendMessage({update:`Waited ${obj.wait} seconds...`})
-            resolve(`Performed `,obj)  
+            resolve(`performed`)  
         }
         else if(obj.event){
-            
-            if(obj.event=='click'){
-                let stopper
-                if(obj.stopper){
-                    chrome.runtime.sendMessage({update:`this has a stop sign, checking...`})
+            let stopper
+            if(obj.stopper){
+                chrome.runtime.sendMessage({update:`this has a stop sign, checking...`})
+                try{
                     stopper=$(obj.stopper)[0]
                 }
+                catch{
+                    chrome.runtime.sendMessage({update:`Couldn't evaluate stop elemnt`}) 
+                    stopper=null
+                }
+            }
+            
+            if(obj.event=='click'){
                 chrome.runtime.sendMessage({update:`searching ${obj.target}`})
                 let el=await loadSelector(obj.target)
                 if(stopper){
                     chrome.runtime.sendMessage({update:`stop element found, STOPPING`})
-                    resolve(`Stop`)  
+                    chrome.runtime.sendMessage({update:`stop element: ${stopper}`})
+                    resolve({stopper:obj.stopper}) 
                 }else{
                     chrome.runtime.sendMessage({update:`stop element absent, proceeding`})
+                    chrome.runtime.sendMessage({update:`stop element: ${stopper}`})
                     chrome.runtime.sendMessage({update:`found,clicking ${obj.target}`})
                     console.log('clicking');
                     el.click();
-                    resolve(`Performed`)  
+                    resolve(`performed`)  
                 }
                 
                 
@@ -142,22 +139,14 @@ const runTidBit=async(obj,remaining)=>{
                     chrome.runtime.sendMessage({update:`searching ${obj.target}`})
                     let el=await loadSelector(obj.target)
                     let parent=el.parentNode
-                    let grand=parent.parentNode
-                    let child=el.firstChild
-                    let granCh=child.firstChild
+                    // let grand=parent.parentNode
+                    // let child=el.firstChild
+                    // let granCh=child.firstChild
                     setTimeout(() => {
                         chrome.runtime.sendMessage({update:`found, scrolling ${obj.target}`})
                         parent.scrollBy({top:obj.depth,behavior:'smooth'})
-                        grand.scrollBy({top:obj.depth,behavior:'smooth'})
-                        child.scrollBy({top:obj.depth,behavior:'smooth'})
-                        granCh.scrollBy({top:obj.depth,behavior:'smooth'})
                         el.scrollBy({top:obj.depth,behavior:'smooth'})
-                        // parent.scroll(0,obj.depth)
-                        // grand.scroll(0,obj.depth)
-                        // child.scroll(0,obj.depth)
-                        // granCh.scroll(0,obj.depth)
-                        // el.scroll(0,obj.depth)
-                        resolve(`Performed`,obj)  
+                        resolve(`performed`)   
                         // sendResponse({done:true})
                     }, 50);
                     
@@ -168,16 +157,15 @@ const runTidBit=async(obj,remaining)=>{
                         chrome.runtime.sendMessage({update:`scrolling main window`})
                         window.scrollBy({top:obj.depth,behavior:'smooth'})  
                         // window.scroll(0,obj.depth) 
-                        resolve(`Performed`,obj)  
+                        resolve(`performed`)  
                         // sendResponse({done:true})
                     }, 50);
                 }
             }
             else if(obj.event=='navigate'){
-                    console.log('Navigating to',obj.target);
-                    chrome.runtime.sendMessage({update:`navigating to ${obj.target}`})
-                    window.location.href=obj.target
-                    chrome.runtime.sendMessage({proceedActions:remaining})
+                    resolve(obj)
+                    // window.location.href=obj.target
+                    // chrome.runtime.sendMessage({proceedActions:remaining,remove:remove})
                     
                     // setTimeout(()=>{
                         
@@ -189,11 +177,17 @@ const runTidBit=async(obj,remaining)=>{
 let runF=[]
 
 
-let runArray=async(arr,rem)=>{
+TidrunTidBit=async(arr,remove)=>{
+    let coppy=[...arr]
     return new Promise(async(resolve,reject)=>{
         for(let m=0;m<arr.length;m++){
-            let perfomed=await runTidBit(arr[m],rem)
-            console.log(perfomed);
+            let perfomed=await runTidBit(arr[m],remove)
+            if(perfomed=='Performed'){
+                coppy.shift()
+            }else{
+
+            }
+            
             if(perfomed=='Stop'){
                 resolve('Stop')
                 break  

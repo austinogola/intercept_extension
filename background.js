@@ -47,14 +47,80 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
     }
 
     if(request.update){
-        console.log(request.update)
+        console.log(`${request.update} tab: ${sender.tab.id}`)
         if(request.update.includes('navig')){
             console.log('loading page...');
+            
+            if(request.remaining){
+                // console.log('Remaining:',request.remaining);
+                // console.log('Remaining actions',request.remaining);
+
+                
+
+                chrome.tabs.update(
+                    sender.tab.id,
+                    {url:request.target,active:true},
+                    async(tab)=>{
+                        // await sleep(15000)
+                        chrome.tabs.onUpdated.addListener(function (tabIdty , info,taby) {
+                            
+                            if (info.status == 'complete') {
+                                
+                             
+                              if(tab.id==taby.id){
+                                console.log('Tab ids:',tab.id,taby.id);
+                                console.log('Opened tab finished loading');
+                    
+                                console.log('Sending the rest to',tab.id);
+                                console.log('Remaining:',request.remaining.length);
+                                if(request.remaining.length==0){
+                                    console.log('Actions finished');
+                                    if(request.remove==true){
+                                        chrome.tabs.remove(sender.tab.id,()=>{
+                                            console.log('Closing tab');
+                                        })
+                                    }
+                                    else{
+                                        console.log('Preserving tab');
+                                    }
+                                }else{
+                                    chrome.tabs.sendMessage(tab.id, {performActions:request.remaining,remove:request.remove});
+                                }
+                              }
+                            }
+                          });
+                        
+
+
+                    }
+                    
+                  )
+
+
+                // if(request.remaining.length!=0){
+
+                //     chrome.tabs.sendMessage(sender.tab.id, {performActions:request.remaining,remove:request.remove});
+
+                // }
+            }
         }
+        
         if(request.update.includes('tions fini')){
-            chrome.tabs.remove(sender.tab.id,()=>{
-                console.log('Closed tab');
-            })
+            if(request.remove==true){
+                notFinished=sender.tab.id;
+                await sleep(5500)
+                console.log('Remove set to',request.remove);
+                chrome.tabs.remove(sender.tab.id,()=>{
+                    console.log('Closing tab');
+                })
+            }
+            else{
+                notFinished=false
+                console.log('Remove set to',request.remove);
+                console.log('Preserving tab');
+                
+            }
+            
         }
         // if(request.proceedFlow){
         //     let action=actionsArr.filter(item=>item.objectId==request.proceedFlow)
@@ -75,6 +141,8 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
 
         
         let fl=[...request.proceedActions]
+
+        console.log('Current remainning',fl);
         let target_page
         fl[0].forEach(item=>{
             console.log(item);
@@ -94,7 +162,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
                 console.log('Navigated page finished loading, continuing');
                 let tabId=tab.id
                 fl.shift()
-                chrome.tabs.sendMessage(sender.tab.id, {performActions:fl});
+                chrome.tabs.sendMessage(sender.tab.id, {performActions:fl,remove:request.remove});
                 // let flow=action.actions
                 // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
               }
@@ -222,7 +290,7 @@ chrome.runtime.onConnect.addListener((port)=>{
 let heaa={}
 let actionsArr
 
-const duplicateRequest=(url,headers,method,destination,label,reqId)=>{
+const duplicateRequest=(url,headers,method,destination,label,reqId,origin_page)=>{
     if(req_ids.includes(reqId)){
         console.log('Duplicate: already handled');
     }
@@ -241,7 +309,7 @@ const duplicateRequest=(url,headers,method,destination,label,reqId)=>{
         .then(async res=>{
             if(res.status==200){
                 let resBody=await res.json()
-            sendResBody(resBody,url,destination,label,'GET')
+            sendResBody(resBody,url,destination,label,'GET',origin_page)
 
             }else{
                 console.log(`Error duplicating (GET) ${url} `);
@@ -269,7 +337,7 @@ var userId
 var taskAdd
 var state
 
-const sendResBody=(result,url,destination,label,method)=>{
+const sendResBody=(result,url,destination,label,method,origin_page)=>{
 
     let data={}
     for (const [key, value] of Object.entries(result)) {
@@ -279,7 +347,9 @@ const sendResBody=(result,url,destination,label,method)=>{
     fetch(destination+'?'+new URLSearchParams({
         user:userId,
         task:taskAdd,
-        label:label
+        label:label,
+        target_page:origin_page,
+        target_url:url
     }),{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -322,7 +392,7 @@ const registerRules=()=>{
             if(userId){
                 console.log('Fetching rules for',userId,' ...')
                 let rulesUri=`https://matureshock.backendless.app/api/data/rule?where=userID='${userId}'`
-                
+            
                 let res=await fetch(rulesUri,{
                     method:'GET',
                     headers:{
@@ -418,6 +488,7 @@ const isValidUrl=(string) =>{
 
 const checkUrls=(rule)=>{
 
+    let actual_first
     let page_first
     let page_rest
 
@@ -427,6 +498,7 @@ const checkUrls=(rule)=>{
     
 
     if(rule.target_page_url){
+        actual_first=rule.target_page_url
         if(rule.target_page_url.includes('*')){
             page_first=rule.target_page_url.split('*')[0]
             page_rest=rule.target_page_url.split('*').slice(1)
@@ -454,6 +526,7 @@ const checkUrls=(rule)=>{
 
                     fmt_obj['url_first']=url_first
                     fmt_obj['url_rest']=url_rest?url_rest:[]
+                    fmt_obj['origin_page']=actual_first
 
                     return fmt_obj
                 }
@@ -612,6 +685,7 @@ const addRuleListeners=(rule_arr)=>{
                         let pageRelevant=false
                         
                         let referer = n.requestHeaders.find(u => u.name.toLowerCase() === "referer").value
+                        
 
                         if(referer.includes(rule.page_first)){
                             pageRelevant=true
@@ -641,12 +715,11 @@ const addRuleListeners=(rule_arr)=>{
                                 
                                 
                                 if(n.method.toUpperCase()=='POST'){
-                                    // console.log('Error Duplicating request (POST)');
                                     // handlePosts(rule,n)
                                 }
                                 else{
 
-                                    duplicateRequest(n.url,reqHeaders,n.method,rule.destination,rule.label,n.requestId)
+                                    duplicateRequest(n.url,reqHeaders,n.method,rule.destination,rule.label,n.requestId,referer)
                                 } 
                                 
 
@@ -760,26 +833,31 @@ const makeWindow=(url,sleeper)=>{
             await sleep(10000)
         }
         if(windowId){
-            console.log('Adding to old');
             chrome.tabs.create({
                 url:url,
-                windowId:windowId
+                windowId:windowId,
+                active:true
             },(tab)=>{
+                console.log('Adding to old window');
                 resolve(tab.id)
             })
             
         }else{
-            console.log('making new');
+            
             chrome.windows.create({
                 focused:false,
                 type:'normal',
-                height:600,
-                width:1300,
-                left:60,
-                top:200,
+                
+                height:900,
+                width:1600,
+                // left:60,
+                // top:200,
+                // state:'maximized',
                 url:url
             },(window)=>{
                 windowId=window.id
+                // chrome.windows.update(windowId,{state:"fullscreen"})
+                console.log('making new window');
                 resolve(window.tabs[0].id)
 
             })  
@@ -787,40 +865,62 @@ const makeWindow=(url,sleeper)=>{
     })
 }
 
-const runActions=async(tabId,action)=>{
-    console.log(tabId);
-    console.log(action);
-    let allActions=action.actions
-    let portId=action.objectId
-    let spreadActions=[]
-    allActions.forEach(item=>{
-        let rpt=item.repeat?item.repeat:1
-        delete item.repeat
-        let arr=[]
-        for(let i=1;i<=rpt;i++){
-            item.flow.forEach(meth=>{
-                if(item.stop_if_present){
-                    meth.stopper=item.stop_if_present
-                }
+let notFinished=true
+
+const runActions=async(tabId,action,remove)=>{
+
+    return new Promise(async(resolve,reject)=>{
+        let allActions=action.actions
+        let portId=action.objectId
+        let spreadActions=[]
+
+        allActions.forEach(item=>{
+            let rpt=item.repeat?item.repeat:1
+            delete item.repeat
+            let arr=[]
+            for(let i=1;i<=rpt;i++){
+                item.flow.forEach(meth=>{
+                    if(item.stop_if_present){
+                        meth.stopper=item.stop_if_present
+                    }
+                    arr.push(meth)
+    
                     
-                // }
-                // console.log(meth);
-                // if(meth.event){
-                //     if(meth.event=='navigate'){
-                //         arr.push(meth)
-                //         spreadActions.push(arr)
-                //     }
-                // }
-                arr.push(meth)
+                })
+            }
+            spreadActions.push(arr)
+        })
 
-                
+        let allActs=[]
+        spreadActions.forEach(item=>{
+            item.forEach(cont=>{
+                allActs.push(cont)
             })
-        }
-        spreadActions.push(arr)
-    })
+        })
 
-    console.log(spreadActions);
-    chrome.tabs.sendMessage(tabId, {performActions:spreadActions});
+        chrome.tabs.sendMessage(tabId, {performActions:allActs,remove:remove});
+        while(notFinished==true){
+            await sleep(5000)
+        }
+
+        if(notFinished==false){
+            resolve('new')
+            notFinished=true
+        }
+        else{
+            resolve(notFinished)
+            notFinished=true
+        }
+
+        
+
+    })
+    
+    
+
+
+    
+
     // for (let i=0;i<spreadActions.length;i++){
     //     if(spreadActions[i].event=='navigate'){
     //         console.log('navigating now');
@@ -848,30 +948,66 @@ const runActions=async(tabId,action)=>{
 const interact=async(actions)=>{
 
     actions=actions.filter(item=>item.userID==userId)
+    // actions=actions.filter(item=>item.name!='Example 4')
     console.log('Formatted actions for ',userId,actions);
 
+    let runningTab
+    for(let i=0;i<actions.length;i++){
+        
+        let tabId=await makeWindow(actions[i].target_page,false)
+        
+
+        const checkCompletion=(action)=>{
+            return new Promise(async(resolve,reject)=>{
+                chrome.tabs.onUpdated.addListener(async function async(tabIdt , info,tab) {
+                // console.log(tabIdt);
+                // console.log(tab);
+                if (info.status === 'complete') {
+                    // console.log(info);
+                // your code ...
+                if(tabIdt==tabId && tab.url==action.target_page){
+                    console.log('Opened tab finished loading');
+                    let remove=true
+
+                    if(typeof(action.remove)=='undefined' || action.remove==null ){
+                        remove=true
+
+                    }else{
+                        remove=action.remove 
+                    }
+
+                    console.log('Remove value set to',remove);
+                    
+                    let flow=action.actions
+                    let statusss=await runActions(tabId,action,remove)
+                    resolve(statusss)
+                    // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
+                    
+                }
+                }
+            });
+            })
+        }
+
+
+        let comp=await checkCompletion(actions[i])
+
+       
+        // await sleep(120000)
+
+
+
+        
+    }
+
     actions.forEach(async (action,indx)=>{
-        let tabId=await makeWindow(action.target_page,false)
-        console.log(tabId);
+        
+        
         
         // let flow=action.actions
         // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
 
-        chrome.tabs.onUpdated.addListener(function (tabIdt , info,tab) {
-            // console.log(tabIdt);
-            // console.log(tab);
-            if (info.status === 'complete') {
-                // console.log(info);
-              // your code ...
-              if(tabIdt==tabId && tab.url==action.target_page){
-                console.log('Opened tab finished loading');
-                let flow=action.actions
-                runActions(tabId,action)
-                // chrome.tabs.sendMessage(tabId, {startConnect:true,flow:flow,id:action.objectId});
-                
-              }
-            }
-          });
+        
 
         
 
@@ -904,8 +1040,8 @@ const registerActions=()=>{
     if(state=='ON'){
         if(userId){
             console.log(`Fetching actions for ${userId}`)
-            let actionsUri=`https://matureshock.backendless.app/api/data/action?userID=${userId}`
-    
+            // let actionsUri=`https://matureshock.backendless.app/api/data/action?userID=`
+            let actionsUri=`https://matureshock.backendless.app/api/data/action?pageSize=100&where=userID='${userId}'`
             fetch(actionsUri,{
                 method:'GET',
                 headers:{
