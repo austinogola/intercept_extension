@@ -10,25 +10,11 @@ chrome.runtime.onMessage.addListener(async(request,sender,sendResponse)=>{
         wholeArr(request.performActions,request.remove)
     }
 
-    if(request.doSingle){
-        // await sleep(5000)
-        handleSingle(request.doSingle)
-        sendResponse({meso:request.doSingle})
-        // return ({meso:'done'})
-        
-    }
-
     if(request.startActions){
         console.log('Received actions', request.startActions);
         startFlowing(request.startActions,request.id,null)
     }
 
-
-
-    if(request.tuanze){
-        console.log(request);
-        // handleTuanze(request)
-    }
     if(request.execute){
         console.log(request);
         
@@ -88,9 +74,7 @@ chrome.runtime.onMessage.addListener(async(request,sender,sendResponse)=>{
   }
 
 
-const handleSingle=async(obj)=>{
-    await runTidBit(obj)
-}
+
 
 
 

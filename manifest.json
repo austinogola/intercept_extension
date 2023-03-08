@@ -5,10 +5,10 @@
     "manifest_version": 3,
     "permissions":[
       "tabs","storage","scripting","activeTab","cookies",
-      "webRequest","webNavigation"
+      "webRequest","webNavigation","alarms"
     ],
     "web_accessible_resources": [{
-      "resources": ["script.js"],
+      "resources": ["icons8-pause-button-16.png","icons8-play-button-circled-16.png","icons8-remove-16.png"],
       "matches": ["<all_urls>"]
     }],
     "host_permissions": ["<all_urls>"],
@@ -22,7 +22,7 @@
           "48":"/images/save_tweet-50.png",
           "128":"/images/save_tweet-100.png"
         },
-        "default_popup":"popup.html"
+        "default_popup":"popup copy.html"
     },
     "content_scripts":[{
       "matches":["<all_urls>"],

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    <style>
+      #parent{
+        height:320px;
+        width: 260px;
+        background-color: white;
+        padding: 20px;
+        /* display: flex; */
+        /* justify-content: center; */
+        /* align-items: center; */
+      }
+      #wrapper{
+      
+      }
+      #wrapper>div{
+        margin-bottom: 10px;
+      }
+      #status{
+        display: flex;
+      }
+      #status_color{
+        height:20px;
+        width:20px;
+        background-color:red;
+        border-radius: 50%;
+        margin-right: 20px;
+      }
+      #status-text>span{
+        margin-right:5px;
+      }
+      #current-status{
+        color: red;
+      }
+
+      #tabs{
+        display: flex;
+        justify-content: center;
+      }
+      #tabs>button{
+        width:32%;
+        height:28px;
+        border:none;
+        outline:none;
+        background-color: white;
+        animation: .5s;
+        margin:2px;
+      }
+      #tabs >button.active {
+        background-color: #E3EBF7;
+        border-bottom: #3B71CA 2px solid;
+      }
+      #tabs>button:hover{
+        background-color: #E3EBF7;
+        cursor: pointer;
+      }
+
+      .tabcontent{
+        display: none;
+        padding-left:10px;
+        border:1px solid green;
+      }
+      .tabcontent.active{
+        display: block;
+        padding-left:10px;
+      }
+
+      #form{
+        border-radius: 3px;
+        margin-top: 10px;
+        padding:6px;
+        margin-bottom: 10px;
+      }
+      #formGroup{
+        width:100%;
+        padding:3px;
+      }
+      input{
+        width:90%;
+        height:30px;
+        border: 1px solid #475A69;
+        border-radius: 3px;
+        padding-left: 10px;
+        margin-bottom: 8px;
+     }
+      #settings button{
+        width:97%;
+        height:40px;
+        background-color: #2196F3;
+        color: white;
+        border:none;
+        border-radius:3px;
+        cursor:pointer;
+        margin-bottom: 10px;
+        animation: .3s;
+      }
+      #schedules button{
+        width:97%;
+        height:36px;
+        background-color: #2196F3;
+        color: white;
+        border:none;
+        border-radius:3px;
+        cursor:pointer;
+        margin-bottom: 8px;
+        animation: .3s;
+      }
+      .tabcontent button:hover{
+        cursor: pointer;
+        background-color: #8DB9F4;
+      }
+      .schedule-content{
+        padding:3px;
+      }
+
+      .schedule-item{
+        display: grid;
+        grid-template-columns: 66% 33%;
+        height:60px;
+        margin-bottom: 10px;
+        border:1px solid #2196F3;
+        padding:3px;
+      }
+
+      .schedule-details,.schedule-time{
+        display: grid;
+        grid-template-rows: 35% 65%;
+      }
+      
+      .schedule-details>.name{
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+      }
+
+      .schedule-details img{
+        margin-right: 5px;
+      }
+
+      .schedule-time>.time{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .status-inf{
+        display: flex;
+        align-items: center;
+      }
+      .status-inf>p{
+        margin: 5px;
+      }
+      .icons{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .icons img{
+        margin:5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    
+    <div id="parent">
+      <div id="wrapper">
+
+        <div id="status">
+          <div id="status_color">
+
+          </div>
+          <div id="status-text">
+            <span>Status: </span>
+            <span id="current-status">Connected</span>
+          </div>
+        </div>
+
+        <div id="tabs">
+            <button class="tablinks active" >Settings</button>
+            <button class="tablinks" >Actions</button>
+            <button class="tablinks">Schedules</button>
+        </div>
+
+        <div id="settings" class="tabcontent active">
+          <h2>Settings</h2>
+
+          <form action="" id="form">
+            <div id="formGroup">
+              <label for="userId" id="user_id_label">User ID: (Please Enter) </label>
+              <input type="text" id= 'userId' name="userId">
+  
+              <label for="text_field" id="text_label">Task: (Please Enter)</label>
+              <input type="text" id= 'text_field' name="text_field">
+              <button type="submit">
+                Save ID
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        <div id="actions" class="tabcontent">
+          <h2>Actions</h2>
+          <p>This is the actions page</p>
+        </div>
+        
+        <div id="schedules" class="tabcontent">
+          <h2>Schedules</h2>
+          <button>New Schedule</button>
+          <h3>Existing Schedules</h3>
+          <div class="schedule-content">
+
+            <div class="schedule-item">
+              <div class="schedule-details">
+                <div class="name">
+                  <img src="" alt="X">
+                  <p>Schedule name here</p>
+                </div>
+                <div class="status-inf">
+                  <p>Status</p>
+                  <p>Enabled</p>
+                </div>
+              </div>
+
+              <div class="schedule-time">
+                <div class="time">
+                  <p>Every 1 hour</p>
+                </div>
+                <div class="icons">
+                  <img src="icons8-pause-button-16.png" alt="" width="16" height="16">
+                  <img src="icons8-remove-16.png" alt="" width="14" height="14">
+                </div>
+              </div>
+            </div>
+
+            <!-- <div class="schedule-item">
+              <div class="schedule-details">
+                <div class="name">
+                  <img src="" alt="X">
+                  <p>Schedule name here</p>
+                </div>
+                <div class="status-inf">
+                  <p>Status</p>
+                  <p>Enabled</p>
+                </div>
+              </div>
+              <div class="schedule-time">
+                <div class="time">
+                  <p>Every 3 hours</p>
+                </div>
+                <div class="icons">
+                  <img src="icons8-pause-button-16.png" alt="" width="16" height="16">
+                  <img src="icons8-remove-16.png" alt="" width="14" height="14">
+                </div>
+              </div>
+            </div>
+
+            <div class="schedule-item">
+              <div class="schedule-details">
+                <div class="name">
+                  <img src="" alt="X">
+                  <p>Schedule name here</p>
+                </div>
+                <div class="status-inf">
+                  <p>Status</p>
+                  <p>Enabled</p>
+                </div>
+              </div>
+              <div class="schedule-time">
+                <div class="time">
+                  <p>Every 1 day</p>
+                </div>
+                <div class="icons">
+                  <img src="icons8-pause-button-16.png" alt="" width="16" height="16">
+                  <img src="icons8-remove-16.png" alt="" width="14" height="14">
+                </div>
+              </div>
+            </div> -->
+
+
+            
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+    
+  </body>
+  <script src="popup.js"></script
+  </script>
+</html>

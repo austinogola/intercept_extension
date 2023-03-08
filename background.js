@@ -2,48 +2,52 @@
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
     if(request.setId){
-        console.log('set id request received');
-        chrome.storage.local.set({userId:request.setId}).then(()=>{
-            console.log(`Set userId to`,userId);
+        userId=request.setId
+        chrome.storage.local.set({userId:userId}).then(async()=>{
+            if(!request.un){
+                console.log(`userId:`,userId);
+                let rules=await registerRules()
+                let schedules=await getSchedules() 
+            }
+            
             
         })
-        userId=request.setId
-        if(request.un){
-
-        }else{
-            let rule_status=await registerRules()
-            console.log(rule_status,'\n','Running Actions');
-            registerActions() 
-        }
+            
     }
 
     if(request.setTask){
-        console.log('set task request received');
         taskAdd=request.setTask
-        chrome.storage.local.set({taskAdd:request.setTask}).then(()=>{
-            console.log(`Set task  to `,taskAdd);
+        chrome.storage.local.set({taskAdd:taskAdd}).then(async()=>{
+            console.log(`task:`,taskAdd);
         })
-        if(request.un){
-
-        }else{
-            let rule_status=await registerRules()
-            console.log(rule_status,'\n','Running Actions');
-            registerActions()  
-        }
+        
+         
     }
 
     if(request.state){
         state=request.state
-        console.log(`Received signal `);
-        chrome.storage.local.set({state:request.state}).then(()=>{
-            console.log(`STATE `,request.state);
+        chrome.storage.local.set({state:state}).then(async()=>{
+            console.log(request.state);
+            if(request.state=='ON' && !request.un){
+                let rules=await registerRules()
+                let schedules=await getSchedules() 
+            }
         })
-        if(request.state=='ON'){
-            let rule_status=await registerRules()
-            console.log(rule_status,'\n','Running Actions');
-            registerActions() 
-        }
         
+    }
+
+    if(request.fetchSchedules){
+        // let schedules=await getSchedules()
+        // sendResponse({schedules:schedules})
+        // return
+    }
+
+    if(request.fetchActions){
+        registerActions()
+    }
+
+    if(request.fetchRules){
+        registerRules()
     }
 
     if(request.update){
@@ -222,10 +226,15 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse)=>{
 
 chrome.runtime.onConnect.addListener((port)=>{
     console.log('Conection made',port)
-    let fTab=port.sender.tab.id
-    console.log(fTab);
+    // let fTab=port.sender.tab.id
+    // console.log(fTab);
     port.onMessage.addListener(async(message,port)=>{
         console.log(message);
+        if(message.fetchSchedules){
+            console.log('NOW RECEIVED SS');
+            let schedules=await getSchedules()
+            port.postMessage({schedules:schedules})
+        }
         if(message.startFlow){
             console.log('Recevied flow',message.startFlow);
             let fl=message.startFlow
@@ -393,76 +402,42 @@ const registerRules=()=>{
                 console.log('Fetching rules for',userId,' ...')
                 let rulesUri=`https://matureshock.backendless.app/api/data/rule?where=userID='${userId}'`
             
-                let res=await fetch(rulesUri,{
-                    method:'GET',
-                    headers:{
-                        'Content-Type':'application/json'
-                    }
-                })
+                try{
+                    let res=await fetch(rulesUri,{
+                        method:'GET',
+                        headers:{
+                            'Content-Type':'application/json'
+                        }
+                    })
 
-                if(res.status==200){
-                    let result=await res.json()
-                    const formatted=await formaT(result)
-
-                    if(formatted.length!=0){
-                        addRuleListeners(formatted)
-                        console.log(`Formatted rules for ${userId}`);
-                        resolve("Done")
-                    }
-                    else{
-                        console.log('No rules to intercept');
-                        resolve(`No ENABLED rules for ${userId}`)
-                    }
-
-
-                }else{
-                    resolve(`Error fetching rules for ${userId}`)
-                }
-                // .then(res=>{
-                //     return res.json()
-                // })
-                // .then(result=>{
-        
-                //     // const rules=result['rules']
-                //     // const destination=result['destination']
-        
-                //     // rules.forEach(rule)
-        
-                //     console.log('rules...',result);
-                //     let target_page=[]
-                //     let target_urls=[]
-                //     let methods=[]
-                //     let dests=[]
-                //     result.forEach(rule=>{
+                    if(res.status==200){
+                        let result=await res.json()
+                        const formatted=await formaT(result)
     
-                //         target_page.push(rule.target_page_url)
-                //         // target_request_url=rule.target_request_url.replace('*','')
-                //         target_urls.push(rule.target_request_url)
-                //         methods.push(rule.target_request_method[0])
-                //         dests.push(rule.destination_webhook_url)
-                //     })
-            
-                //     if(target_page.length!==0 && target_urls.length!=0 && methods.length!=0 && dests.length!=0){
-                //         console.log('Formating rules...');
-                //         const formatted=await formaT(result)
-                //         console.log('valid enabled rules',formatted)
-                //         // if(formatted.length)
-                //         addRuleListeners(formatted)
-                //     }
-                //     else{
-                //         console.log('Error fetching all the rules');
-                //         // console.log(result);
-                //     }
-                //     // addIntpt(target_page,target_urls,methods,dests)
-                    
-            
-                // })
+                        if(formatted.length!=0){
+                            addRuleListeners(formatted)
+                            resolve("Done")
+                        }
+                        else{
+                            resolve(`No rules enabled for ${userId}`)
+                        }
+    
+    
+                    }else{
+                        resolve(`Error fetching rules for ${userId}`)
+                    }
+
+                }
+                catch{
+                    console.log('Network error.Could not fetch rules');
+                    resolve('None')
+                }
+                
+
             }else{
-                console.log('No user id');
-                resolve('NO ID')
+                resolve('No user id set')
             }
         }else{
-            console.log('Interceptor OFF')
             resolve('OFF')
         }
 
@@ -474,7 +449,6 @@ const registerRules=()=>{
     
 }
 
-// registerRules()
 
 const isValidUrl=(string) =>{
     let url;
@@ -568,6 +542,8 @@ const formaT=(raw_rules)=>{
             
         })
 
+        console.log('Enabled rules...',enabled_rules);
+
         if(enabled_rules.length>0){
             enabled_rules.forEach(rule=>{
                 let rule_status=checkUrls(rule)
@@ -585,17 +561,50 @@ const formaT=(raw_rules)=>{
 
 }
 
-chrome.storage.local.get(['userID']).then(async result=>{
-    if(result.userId){
-        console.log('User id found');
-        userId=result.userId
-        let rule_status=await registerRules()
-        console.log(rule_status,'\n','Running Actions');
-        registerActions() 
-    }else{
-        console.log('No user Id',result);
+const runEverything=async()=>{
+    if(state=='OFF'){
+        console.log('Off');
     }
-})
+    else{
+        state='ON'
+        chrome.storage.local.get(['userId']).then(async result=>{
+            if(result.userId){
+                userId=result.userId
+                console.log('User id :',userId);
+                let rules=await registerRules()
+                getSchedules() 
+            }else{
+                if(userId){
+                    chrome.storage.local.set({userId:userId}).then(()=>{
+                        console.log('User id :',userId);   
+                    })
+                    let rules=await registerRules()
+                    getSchedules() 
+                }
+                else{
+                    console.log('No user id');
+                }
+            }
+        })
+
+        
+    }
+    
+}
+
+runEverything()
+
+// chrome.storage.local.get(['userID']).then(async result=>{
+//     if(result.userId){
+//         userId=result.userId
+//         console.log('User id :',userId);
+//         let rule_status=await registerRules()
+//         console.log(rule_status,'\n','Running Actions');
+//         registerActions() 
+//     }else{
+//         console.log('No user id');
+//     }
+// })
 
 var reqHeaders=[]
 
@@ -665,30 +674,24 @@ const addRuleListeners=(rule_arr)=>{
 
     req_ids=[]
     
-    if(state=='OFF'){
-        if(!already){
-            already=true
-            console.log('Interceptor Turned off');
-        }
-    }else{
-        rule_arr.forEach(rule=>{
+    rule_arr.forEach(rule=>{
 
-            chrome.webRequest.onBeforeSendHeaders.addListener((n)=>{
-                if(state=='OFF'){
+        chrome.webRequest.onBeforeSendHeaders.addListener((n)=>{
+            if(state=='OFF'){
 
-                }else{
-                    if(n.initiator.includes('chrome-extension')){
-                        
-                    }
-                    else{
-                        reqHeaders=n.requestHeaders
-                        let pageRelevant=false
-                        
-                        let referer = n.requestHeaders.find(u => u.name.toLowerCase() === "referer").value
-                        
+            }else{
+                if(n.initiator.includes('chrome-extension')){
+                    
+                }
+                else{
+                    reqHeaders=n.requestHeaders
+                    let pageRelevant=false
+                    
+                    let referer = n.requestHeaders.find(u => u.name.toLowerCase() === "referer").value
+                    
 
-                        if(referer.includes(rule.page_first)){
-                            pageRelevant=true
+                    if(referer.includes(rule.page_first)){
+                        pageRelevant=true
 
                             if(rule.page_rest.length!=0){
                                 rule.page_rest.forEach(val=>{
@@ -787,7 +790,6 @@ const addRuleListeners=(rule_arr)=>{
             },{urls:[`${rule.url_first}*`]},["requestBody","extraHeaders"])
         })
         console.log("Rule listeners added")
-    }
     
 }
 
@@ -796,18 +798,14 @@ const addRuleListeners=(rule_arr)=>{
 //         if(changes.taskAdd){
 //             taskAdd=changes.taskAdd.newValue
 //             console.log('task:',taskAdd);
-//             registerRules()
-//             registerActions()
-//         }
+//   
 //         if(changes.userId){
 //             userId=changes.userId.newValue;
 //             console.log('userId:',userId);
-//             registerRules()
-//             registerActions()
-//         }
+//   
 //         if(changes.state){
 //             if(changes.state.newValue=='ON'){
-//                 registerRules()
+//       
 //                 registerActions()
 //             }
 //             console.log(state);
@@ -898,6 +896,8 @@ const runActions=async(tabId,action,remove)=>{
             })
         })
 
+        console.log(allActs);
+
         chrome.tabs.sendMessage(tabId, {performActions:allActs,remove:remove});
         while(notFinished==true){
             await sleep(5000)
@@ -955,6 +955,8 @@ const interact=async(actions)=>{
     for(let i=0;i<actions.length;i++){
         
         let tabId=await makeWindow(actions[i].target_page,false)
+
+        console.log(actions[i]);
         
 
         const checkCompletion=(action)=>{
@@ -1032,10 +1034,48 @@ const interact=async(actions)=>{
     
 }
 
+const getSchedules=()=>{
+    return new Promise(async(resolve,reject)=>{
+        console.log('Fetching schedules');
+        let schedulesUrl=`https://matureshock.backendless.app/api/data/schedules?where=userID%3D'${userId}'`
+        
+        try{
+            let res=await fetch(schedulesUrl,{
+                method:'GET',
+                headers:{
+                    'Content-Type':'application/json'
+                }
+            })
+
+            if(res.status==200){
+               
+                let result=await res.json()
+                console.log('Schedules...',result);
+                // handleSchedules(result)
+                resolve(result)
+
+            }else{
+                resolve(`Error fetching schedules for ${userId}`)
+            }
+
+        }
+        catch{
+            console.log('Network error.Could not fetch schedules');
+            resolve('None')
+        }
+    })
+    
+}
+
+const handleSchedules=async(arr)=>{
+
+}
+
+
 
 const registerActions=()=>{
-    
     // userId=userId.replace("'","")
+    // return
     
     if(state=='ON'){
         if(userId){
@@ -1077,6 +1117,5 @@ const registerActions=()=>{
     
 }
 
-registerActions()
 
 
